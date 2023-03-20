@@ -66,7 +66,7 @@ namespace ComponentAttacherSearch
                 getTextContent(textField).OnValueChange += makeBuildUICall(attacher);
 
                 builder = new UIBuilder(footer);
-                builder.Button("∅").LocalPressed += (sender, args) => textField.Editor.Target.Text.Target.Text = null;
+                MakeLocalButton(builder, "∅", (sender) => textField.Editor.Target.Text.Target.Text = null);
 
                 return textField;
             }
@@ -100,8 +100,8 @@ namespace ComponentAttacherSearch
                     getTextContent(details.SearchBar).Value = search;
                 }
 
-                if (search == null)
-                    __instance.RunSynchronously(() => getTextContent(details.SearchBar).Value = null);
+                if (search == null && !details.SearchBar.Editor.Target.IsEditing)
+                    getTextContent(details.SearchBar).Value = null;
 
                 if (string.IsNullOrWhiteSpace(search) || (search.Length < 3 && path.Length < 2))
                     return true;
@@ -133,10 +133,10 @@ namespace ComponentAttacherSearch
 
             private static void clearSearchbar(ComponentAttacher attacher)
             {
-                var uiRoot = (SyncRef<Slot>)attacher.TryGetField("_uiRoot");
+                var contentRoot = attacher._uiRoot.Target.Parent;
 
-                uiRoot.Target.Parent.Parent = uiRoot.Target.Parent.Parent.Parent;
-                uiRoot.Target.Parent.Parent.DestroyChildren(filter: slot => slot != uiRoot.Target.Parent);
+                contentRoot.Parent = contentRoot.Parent.Parent;
+                contentRoot.Parent.DestroyChildren(filter: slot => slot != contentRoot);
             }
 
             private static SyncField<string> getTextContent(TextField textField)
@@ -144,9 +144,20 @@ namespace ComponentAttacherSearch
 
             private static SyncFieldEvent<string> makeBuildUICall(ComponentAttacher attacher)
             {
-                var buildUI = AccessTools.MethodDelegate<Action<string, bool>>(buildUIMethod, attacher);
+                return field => attacher.BuildUI(attacherDetails.GetOrCreateValue(attacher).LastPath + searchPath + field.Value, false);
+            }
 
-                return field => buildUI(attacherDetails.GetOrCreateValue(attacher).LastPath + searchPath + field.Value, false);
+            private static Button MakeLocalButton(UIBuilder builder, LocaleString text, Action<IButton> action)
+            {
+                var button = builder.Button(text);
+
+                var valueField = button.Slot.AttachComponent<ValueField<bool>>().Value;
+                var toggle = button.Slot.AttachComponent<ButtonToggle>();
+                toggle.TargetValue.Target = valueField;
+
+                valueField.OnValueChange += field => action(button);
+
+                return button;
             }
 
             private static CategoryNode<Type> pickComponentLibrary(ref string path, out string search)
@@ -186,7 +197,9 @@ namespace ComponentAttacherSearch
                 var includeFavorites = root.Name == "Favorites";
 
                 var queue = new Queue<CategoryNode<Type>>();
-                queue.Enqueue(root);
+
+                foreach (var subCategory in root.Subcategories)
+                    queue.Enqueue(subCategory);
 
                 while (queue.Count > 0)
                 {
@@ -207,7 +220,7 @@ namespace ComponentAttacherSearch
                 => CultureInfo.InvariantCulture.CompareInfo.IndexOf(haystack, needle, CompareOptions.IgnoreCase) >= 0;
 
             private static IEnumerable<Type> searchTypes(CategoryNode<Type> root, string search)
-                => searchCategories(root).SelectMany(category => category.Elements).Where(type => searchContains(type.Name, search));
+                => root.Elements.Concat(searchCategories(root).SelectMany(category => category.Elements)).Where(type => searchContains(type.Name, search));
         }
     }
 }
