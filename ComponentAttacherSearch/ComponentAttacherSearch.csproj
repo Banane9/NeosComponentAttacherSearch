@@ -58,6 +58,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttacherDetails.cs" />
+    <Compile Include="ComponentAttacherPatch.cs" />
     <Compile Include="ComponentAttacherSearch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

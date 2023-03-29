@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ComponentAttacherSearch
@@ -18,9 +19,13 @@ namespace ComponentAttacherSearch
         private static readonly MethodInfo onOpenCategoryPressedMethod = componentAttacherType.GetMethod("OnOpenCategoryPressed", AccessTools.allDeclared);
         private static readonly MethodInfo openGenericTypesPressedMethod = componentAttacherType.GetMethod("OpenGenericTypesPressed", AccessTools.allDeclared);
 
+        public TextEditor Editor => SearchBar.Editor.Target;
+
         public bool HasSearchBar => SearchBar != null;
 
         public string LastPath { get; set; }
+
+        public CancellationTokenSource LastResultUpdate { get; set; } = new CancellationTokenSource();
 
         public string LastSearch { get; set; }
 
@@ -31,7 +36,10 @@ namespace ComponentAttacherSearch
         public ButtonEventHandler<string> OnOpenCategoryPressed { get; }
 
         public ButtonEventHandler<string> OpenGenericTypesPressed { get; }
+
         public TextField SearchBar { get; set; }
+
+        public Text Text => (Text)Editor.Text.Target;
 
         public AttacherDetails(ComponentAttacher attacher)
         {
@@ -41,7 +49,6 @@ namespace ComponentAttacherSearch
             OnCancelPressed = AccessTools.MethodDelegate<ButtonEventHandler>(onCancelPressedMethod, attacher);
         }
 
-        public static AttacherDetails New(ComponentAttacher attacher)
-            => new AttacherDetails(attacher);
+        public static AttacherDetails New(ComponentAttacher attacher) => new(attacher);
     }
 }
