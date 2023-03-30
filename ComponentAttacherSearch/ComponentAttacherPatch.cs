@@ -25,6 +25,57 @@ namespace ComponentAttacherSearch
             private static readonly color genericTypeColor = new(0.8f, 1f, 0.8f, 1f);
             private static readonly color typeColor = new(0.8f, 0.8f, 1f, 1f);
 
+            private static void AddHoverButtons(UIBuilder builder, AttacherDetails details, string path, string search, IEnumerable<ComponentResult> results)
+            {
+                foreach (var result in results)
+                {
+                    var name = result.Type.GetNiceName();
+
+                    var button = result.Type.IsGenericTypeDefinition ?
+                            builder.Button(name, genericTypeColor, details.OpenGenericTypesPressed, Path.Combine(path + searchPath + search, result.Type.FullName), 0.35f)
+                            : builder.Button(name, typeColor, details.OnAddComponentPressed, result.Type.FullName, 0.35f);
+
+                    button.Label.ParseRichText.Value = false;
+
+                    var booleanDriver = button.Slot.AttachComponent<BooleanValueDriver<string>>();
+                    booleanDriver.TargetField.Target = button.LabelTextField;
+                    booleanDriver.State.DriveFrom(button.IsHovering);
+
+                    booleanDriver.TrueValue.Value = GetPrettyPath(result.Category.GetPath()) + " > " + name;
+                    booleanDriver.FalseValue.Value = name;
+                }
+            }
+
+            private static void AddPermanentButtons(UIBuilder builder, AttacherDetails details, string path, string search, IEnumerable<ComponentResult> results)
+            {
+                builder.PushStyle();
+                builder.Style.MinHeight = 48;
+                var root = builder.CurrentRect;
+
+                foreach (var result in results)
+                {
+                    var name = result.Type.GetNiceName();
+
+                    var button = result.Type.IsGenericTypeDefinition ?
+                            builder.Button(name, genericTypeColor, details.OpenGenericTypesPressed, Path.Combine(path + searchPath + search, result.Type.FullName), 0.35f)
+                            : builder.Button(name, typeColor, details.OnAddComponentPressed, result.Type.FullName, 0.35f);
+
+                    button.Label.ParseRichText.Value = false;
+                    builder.NestInto(button.RectTransform);
+
+                    builder.HorizontalHeader(20, out var header, out var content);
+                    ((Text)button.LabelTextField.Parent).Slot.Parent = content.Slot;
+
+                    builder.NestInto(header);
+                    builder.Text(GetPrettyPath(result.Category.GetPath()) + " >", parseRTF: false).Color.Value = color.DarkGray;
+
+                    builder.NestOut();
+                    builder.NestOut();
+                }
+
+                builder.PopStyle();
+            }
+
             private static void AddSearchbar(ComponentAttacher attacher, AttacherDetails details)
             {
                 var uiRoot = (SyncRef<Slot>)attacher.TryGetField("_uiRoot");
@@ -80,7 +131,7 @@ namespace ComponentAttacherSearch
                     details.Text.Content.Value = search;
                 }
 
-                if (search == null && !details.SearchBar.Editor.Target.IsEditing)
+                if (search == null && !details.Editor.IsEditing)
                     details.Text.Content.Value = null;
 
                 if (string.IsNullOrWhiteSpace(search) || (search.Length < 3 && path.Length < 2))
@@ -88,23 +139,20 @@ namespace ComponentAttacherSearch
 
                 var builder = new UIBuilder(__instance._uiRoot);
                 builder.Root.DestroyChildren();
-                builder.Style.MinHeight = 32f;
+                builder.Style.MinHeight = 32;
 
                 foreach (var subCategory in SearchCategories(componentLibrary, search))
                 {
                     var categoryPath = subCategory.GetPath();
-                    builder.Button(categoryPath.Substring(1).Replace("/", " > ") + " >", categoryColor, details.OnOpenCategoryPressed, subCategory.GetPath(), 0.35f).Label.ParseRichText.Value = false;
+                    builder.Button(GetPrettyPath(categoryPath) + " >", categoryColor, details.OnOpenCategoryPressed, categoryPath, 0.35f).Label.ParseRichText.Value = false;
                 }
 
-                foreach (var type in SearchTypes(componentLibrary, search))
-                {
-                    var name = type.GetNiceName();
+                var typeResults = SearchTypes(componentLibrary, search);
 
-                    if (type.IsGenericTypeDefinition)
-                        builder.Button(name, genericTypeColor, details.OpenGenericTypesPressed, Path.Combine(path + searchPath + search, type.FullName), 0.35f).Label.ParseRichText.Value = false;
-                    else
-                        builder.Button(name, typeColor, details.OnAddComponentPressed, type.FullName, 0.35f).Label.ParseRichText.Value = false;
-                }
+                if (Config.GetValue(AlwaysShowFullPath))
+                    AddPermanentButtons(builder, details, path, search, typeResults);
+                else
+                    AddHoverButtons(builder, details, path, search, typeResults);
 
                 builder.Button("Cancel", cancelColor, details.OnCancelPressed, 0.35f);
 
@@ -118,6 +166,9 @@ namespace ComponentAttacherSearch
                 contentRoot.Parent = contentRoot.Parent.Parent;
                 contentRoot.Parent.DestroyChildren(filter: slot => slot != contentRoot);
             }
+
+            private static string GetPrettyPath(string path)
+                => path.Substring(1).Replace("/", " > ");
 
             private static SyncFieldEvent<string> MakeBuildUICall(ComponentAttacher attacher, AttacherDetails details)
             {
@@ -212,8 +263,17 @@ namespace ComponentAttacherSearch
             private static bool SearchContains(string haystack, string needle)
                 => CultureInfo.InvariantCulture.CompareInfo.IndexOf(haystack, needle, CompareOptions.IgnoreCase) >= 0;
 
-            private static IEnumerable<Type> SearchTypes(CategoryNode<Type> root, string search)
-                => root.Elements.Concat(SearchCategories(root).SelectMany(category => category.Elements)).Where(type => SearchContains(type.Name, search));
+            private static IEnumerable<ComponentResult> SearchTypes(CategoryNode<Type> root, string search)
+                => root.Elements
+                    .Where(type => SearchContains(type.Name, search))
+                    .Select(type => new ComponentResult(root, type))
+                    .Concat(
+                        SearchCategories(root)
+                        .SelectMany(category =>
+                            category.Elements
+                            .Where(type => SearchContains(type.Name, search))
+                            .Select(type => new ComponentResult(category, type))))
+                    .OrderBy(result => result.Type.Name);
         }
     }
 }

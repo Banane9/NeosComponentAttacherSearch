@@ -60,6 +60,7 @@
     <Compile Include="AttacherDetails.cs" />
     <Compile Include="ComponentAttacherPatch.cs" />
     <Compile Include="ComponentAttacherSearch.cs" />
+    <Compile Include="ComponentResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

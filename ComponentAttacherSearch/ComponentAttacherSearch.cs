@@ -10,6 +10,9 @@ namespace ComponentAttacherSearch
         internal static ModConfiguration Config;
 
         [AutoRegisterConfigKey]
+        private static readonly ModConfigurationKey<bool> AlwaysShowFullPath = new("AlwaysShowFullPath", "Whether to always show the full category path on component results, rather than only on hover.", () => true);
+
+        [AutoRegisterConfigKey]
         private static readonly ModConfigurationKey<HashSet<string>> ExcludedCategoriesKey = new("ExcludedCategories", "Exclude specific categories. Discarded while loading.", internalAccessOnly: true);
 
         [AutoRegisterConfigKey]
